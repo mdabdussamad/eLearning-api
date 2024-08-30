@@ -21,7 +21,7 @@ app.use(cookieParser());
 // CORS => Cross-Origin Resource Sharing
 app.use(
   cors({
-    origin: process.env.ORIGIN,      
+    origin: [process.env.ORIGIN, 'https://e-learning-client-chi.vercel.app'],     
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials:true,
   })
