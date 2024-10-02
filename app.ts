@@ -18,10 +18,10 @@ app.use(express.json({ limit: "50mb" }));
 // Cookie parser
 app.use(cookieParser());
 
-// CORS => Cross-Origin Resource Sharing
 app.use(
   cors({
-    origin: ['https://e-learning-client-chi.vercel.app'],   
+       
+    origin: process.env.ORIGIN,   
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials:true,
   })
