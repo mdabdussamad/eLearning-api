@@ -1,18 +1,18 @@
 import express from "express";
-import { addAnswer, addQuestion, addRelyReview, addReview, deleteCourse, editCourse, getAllCourses, getCourseByUser, getSingleCourse, uploadCourse } from "../controllers/course.controller";
+import { addAnswer, addQuestion, addRelyReview, addReview, deleteCourse, editCourse, generateYouTubeUrl, getAdminAllCourses, getAllCourses, getCourseByUser, getSingleCourse, uploadCourse } from "../controllers/course.controller";
 import { authorizeRoles, isAuthenticated } from "../middleware/auth";
 
 const courseRouter = express.Router();
 
 courseRouter.post(
-  "/create-course",
+  "/create-course",  
   isAuthenticated,
   authorizeRoles("admin"),
   uploadCourse
 );
 
 courseRouter.put(
-  "/edit-course/:id",
+  "/edit-course/:id",  
   isAuthenticated,
   authorizeRoles("admin"),
   editCourse
@@ -29,45 +29,62 @@ courseRouter.get(
 );
 
 courseRouter.get(
-  "/get-course-content/:id", 
+  "/get-admin-courses", 
+  isAuthenticated,
+  authorizeRoles("admin"),
+  getAdminAllCourses
+);
+
+courseRouter.get(
+  "/get-course-content/:id",  
   isAuthenticated, 
   getCourseByUser
 );
 
 courseRouter.put(
-  "/add-question", 
+  "/add-question",  
   isAuthenticated, 
   addQuestion,
 );
 
 courseRouter.put(
-  "/add-answer", 
+  "/add-answer",   
   isAuthenticated, 
   addAnswer,
 );
 
 courseRouter.put(
-  "/add-review/:id", 
+  "/add-review/:id",   
   isAuthenticated, 
   addReview,
 );
 
 courseRouter.put(
-  "/add-reply", 
-  isAuthenticated,
+  "/add-reply",    
   authorizeRoles("admin"), 
   addRelyReview,
 );
 
-courseRouter.get(
-  "/get-courses", 
-  isAuthenticated,
-  authorizeRoles("admin"), 
-  getAllCourses,
-);
+// courseRouter.get(
+//   "/get-courses", 
+//   updateAccessToken,
+//   isAuthenticated,
+//   authorizeRoles("admin"), 
+//   getAllCourses,
+// );
+
+// courseRouter.post(
+//   "/getVdoCipherOTP",   
+//   generateVideoUrl,
+// );
+
+// courseRouter.post(
+//   "/getYouTubeUrl", 
+//   generateYouTubeUrl,
+// );
 
 courseRouter.delete(
-  "/delete-course/:id", 
+  "/delete-course/:id",  
   isAuthenticated,
   authorizeRoles("admin"), 
   deleteCourse,

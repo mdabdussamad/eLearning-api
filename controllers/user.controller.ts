@@ -217,7 +217,9 @@ export const updateAccessToken = CatchAsyncError(
       const session = await redis.get(decoded.id as string);
 
       if (!session) {
-        return next(new ErrorHandler('Please login for access this resources!', 400));
+        return next(
+          new ErrorHandler("Please login for access this resources!", 400)
+        );
       }
 
       const user = JSON.parse(session);
@@ -243,14 +245,11 @@ export const updateAccessToken = CatchAsyncError(
       res.cookie("access_token", accessToken, accessTokenOptions);
       res.cookie("refresh_token", refreshToken, refreshTokenOptions);
 
-      await redis.set(user._id, JSON.stringify(user), "EX", 604800 ); // 7days
+      await redis.set(user._id, JSON.stringify(user), "EX", 604800); // 7days
 
-      res.status(200).json({
-        status: "Success",
-        accessToken,
-      });
+      return next();
     } catch (error: any) {
-      return next(new ErrorHandler("Server Error", 400));
+      return next(new ErrorHandler(error.message, 400));
     }
   }
 );
@@ -300,18 +299,10 @@ interface IUpdateUserInfo {
 export const updateUserInfo = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { name, email } = req.body as IUpdateUserInfo;
+      const { name } = req.body as IUpdateUserInfo;
+
       const userId = req.user?._id as string;
       const user = await userModel.findById(userId);
-
-      if (email && user) {
-        const isEmailExist = await userModel.findOne({ email });
-        if (isEmailExist) {
-          return next(new ErrorHandler("Email already exist", 400));
-        }
-
-        user.email = email;
-      }
 
       if (name && user) {
         user.name = name;
@@ -438,8 +429,17 @@ export const getAllUsers = CatchAsyncError(
 export const updateUserRole = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { id, role } = req.body;
-      updateUserRolService(res, id, role);
+      const { email, role } = req.body;
+      const isUserExist = await userModel.findOne({ email });
+      if (isUserExist) {
+        const id = isUserExist._id as string;
+        updateUserRolService(res, id, role);
+      } else {
+        res.status(400).json({
+          success: false,
+          message: "User not found",
+        });
+      }
     } catch (error: any) {
       return next(new ErrorHandler(error.message, 400));
     }

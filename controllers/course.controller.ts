@@ -42,11 +42,15 @@ export const editCourse = CatchAsyncError(
 
       const thumbnail = data.thumbnail;
 
-      if (thumbnail) {
-        await cloudinary.v2.uploader.destroy(thumbnail.public_id);
+      const courseId = req.params.id;
+
+      const courseData = await CourseModel.findById(courseId) as any;
+
+      if (thumbnail && !thumbnail.startsWith("https")) {
+        await cloudinary.v2.uploader.destroy(courseData.thumbnail.public_id);
 
         const myCloud = await cloudinary.v2.uploader.upload(thumbnail, {
-          folder: "course",
+          folder: "courses",
         });
 
         data.thumbnail = {
@@ -55,8 +59,13 @@ export const editCourse = CatchAsyncError(
         };
       }
 
-      const courseId = req.params.id;
-
+      if(thumbnail.startsWith("https")){
+        data.thumbnai = {
+          public_id: courseData?.thumbnail.public_id,
+          url: courseData?.thumbnail.url,
+        };
+      }
+    
       const course = await CourseModel.findByIdAndUpdate(
         courseId,
         {
@@ -94,7 +103,7 @@ export const getSingleCourse = CatchAsyncError(
           "-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links"
         );
 
-        await redis.set(courseId, JSON.stringify(course), 'EX', 604800); // 7 days expire
+        await redis.set(courseId, JSON.stringify(course), "EX", 604800); // 7 days expire
 
         res.status(200).json({
           success: true,
@@ -111,25 +120,14 @@ export const getSingleCourse = CatchAsyncError(
 export const getAllCourses = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const isCatcheExist = await redis.get("allCourses");
-      if (isCatcheExist) {
-        const courses = JSON.parse(isCatcheExist);
-        res.status(200).json({
-          success: true,
-          courses,
-        });
-      } else {
-        const courses = await CourseModel.find().select(
-          "-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links"
-        );
+      const courses = await CourseModel.find().select(
+        "-courseData.videoUrl -courseData.suggestion -courseData.questions -courseData.links"
+      );
 
-        await redis.set("allCourses", JSON.stringify(courses));
-
-        res.status(200).json({
-          success: true,
-          courses,
-        });
-      }
+      res.status(200).json({
+        success: true,
+        courses,
+      });
     } catch (error: any) {
       return next(new ErrorHandler(error.message, 500));
     }
@@ -205,7 +203,7 @@ export const addQuestion = CatchAsyncError(
       await NotificationModel.create({
         user: req.user?._id,
         title: "New Question Received",
-        message: `You have a new question in ${courseContent.title}`
+        message: `You have a new question in ${courseContent.title}`,
       });
 
       // Save the updated course
@@ -388,26 +386,28 @@ export const addRelyReview = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { comment, courseId, reviewId } = req.body as IAddReviewData;
-    
+
       const course = await CourseModel.findById(courseId);
 
-      if(!course){
+      if (!course) {
         return next(new ErrorHandler("Course not found", 404));
       }
 
-      const review = course?.reviews?.find((rev:any)=>rev._id.toString()===reviewId)
+      const review = course?.reviews?.find(
+        (rev: any) => rev._id.toString() === reviewId
+      );
 
-      if(!review){
+      if (!review) {
         return next(new ErrorHandler("Review not found", 404));
       }
 
-      const replyData:any={
-        user:req.user,
-        comment
+      const replyData: any = {
+        user: req.user,
+        comment,
       };
 
-      if(!review.commentReplies){
-        review.commentReplies=[];
+      if (!review.commentReplies) {
+        review.commentReplies = [];
       }
 
       review.commentReplies?.push(replyData);
@@ -418,7 +418,6 @@ export const addRelyReview = CatchAsyncError(
         success: true,
         course,
       });
-
     } catch (error: any) {
       return next(new ErrorHandler(error.message, 500));
     }
@@ -426,14 +425,15 @@ export const addRelyReview = CatchAsyncError(
 );
 
 // Get all courses - only for admin
-export const getAllUsers = CatchAsyncError(async(req:Request,res:Response,next:NextFunction)=>{
-  try {
-    
-    getAllCoursesService(res);
-  } catch (error:any) {
-    return next(new ErrorHandler(error.message, 400));
+export const getAdminAllCourses = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      getAllCoursesService(res);
+    } catch (error: any) {
+      return next(new ErrorHandler(error.message, 400));
+    }
   }
-});
+);
 
 // Delete course - only for admin
 export const deleteCourse = CatchAsyncError(
@@ -461,3 +461,43 @@ export const deleteCourse = CatchAsyncError(
   }
 );
 
+// export const generateVideoUrl = CatchAsyncError(
+//   async (req: Request, res: Response, next: NextFunction) => {
+//     try {
+//       const { videoId } = req.body;
+//       const response = await axios.post(
+//         `https://dev.vdocipher.com/api/videos/${videoId}/opt`,
+//         { ttl: 300 },
+//         {
+//           headers: {
+//             Accept: "application/json",
+//             "Content-Type": "application/json",
+//             Authorization: `Apisecret ${process.env.VDOCIPHER_API_SECRET}`,
+//           },
+//         }
+//       );
+
+//       res.json(response.data);
+//     } catch (error: any) {
+//       return next(new ErrorHandler(error.message, 400));
+//     }
+//   }
+// );
+
+export const generateYouTubeUrl = CatchAsyncError(
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { videoId } = req.body;
+
+      if (!videoId) {
+        return res.status(400).json({ message: "Video ID is required" });
+      }
+
+      const youtubeUrl = `https://www.youtube.com/embed/${videoId}`;
+
+      res.json({ videoUrl: youtubeUrl });
+    } catch (error: any) {
+      return next(new ErrorHandler(error.message, 400));
+    }
+  }
+);

@@ -5,7 +5,7 @@ import { getCoursesAnalytics, getOrdersAnalytics, getUsersAnalytics } from "../c
 const analyticsRouter = express.Router();
 
 analyticsRouter.get(
-  "/get-users-analytics",
+  "/get-users-analytics", 
   isAuthenticated,
   authorizeRoles("admin"),
   getUsersAnalytics
@@ -17,7 +17,7 @@ analyticsRouter.get(
   getOrdersAnalytics
 );
 analyticsRouter.get(
-  "/get-courses-analytics",
+  "/get-courses-analytics", 
   isAuthenticated,
   authorizeRoles("admin"),
   getCoursesAnalytics
