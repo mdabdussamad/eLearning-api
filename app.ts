@@ -9,6 +9,7 @@ import orderRouter from "./routes/order.route";
 import notificationRouter from "./routes/notification.route";
 import analyticsRouter from "./routes/analytics.route";
 import layoutRouter from "./routes/layout.route";
+import { rateLimit } from "express-rate-limit";
 
 export const app = express();
 
@@ -18,17 +19,34 @@ app.use(express.json({ limit: "50mb" }));
 // Cookie parser
 app.use(cookieParser());
 
+// Cors => cross origin resource sharing
 app.use(
   cors({
-       
-    origin: process.env.ORIGIN,   
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials:true,
+    // origin: process.env.ORIGIN,
+    origin: ["http://localhost:3000"],
+    // methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true,
   })
 );
 
+// api requests limit
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 100, 
+  standardHeaders: "draft-7",
+  legacyHeaders: false, 
+});
+
 // Routes
-app.use("/api/v1", userRouter, courseRouter, orderRouter, notificationRouter, analyticsRouter,layoutRouter);
+app.use(
+  "/api/v1",
+  userRouter,
+  courseRouter,
+  orderRouter,
+  notificationRouter,
+  analyticsRouter,
+  layoutRouter
+);
 
 // Testing API
 app.get("/test", (req: Request, res: Response, next: NextFunction) => {
@@ -45,5 +63,6 @@ app.all("*", (req: Request, res: Response, next: NextFunction) => {
   next(err);
 });
 
-// Error Middleware
+// Middleware calls
+app.use(limiter);
 app.use(ErrorMiddleware);

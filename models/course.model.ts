@@ -32,7 +32,7 @@ interface ICourseData extends Document{
     questions: IComment[];
 }
 
-interface ICourse extends Document{
+export interface ICourse extends Document{
     name: string;
     description: string;
     categories: string;
@@ -46,7 +46,7 @@ interface ICourse extends Document{
     prerequisites: {title: string}[];
     reviews: IReview[];
     courseData: ICourseData[];
-    ratings: number;
+    ratings?: number;
     purchased: number;    
 }
 
@@ -58,7 +58,7 @@ const reviewSchema = new Schema<IReview>({
     },
     comment: String,
     commentReplies: [Object],
-});
+},{timestamps: true});
 
 const linkSchema = new Schema<ILink>({
     title: String,
@@ -69,7 +69,7 @@ const commentSchema = new Schema<IComment>({
     user: Object,
     question: String,
     questionReplies: [Object],    
-});
+},{timestamps: true});
 
 const courseDataSchema = new Schema<ICourseData>({
     videoUrl: String,    
