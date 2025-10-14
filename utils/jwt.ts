@@ -1,4 +1,5 @@
-require("dotenv").config();
+import dotenv from 'dotenv';
+dotenv.config();
 import { Response } from "express";
 import { IUser } from "../models/user.model";
 import { redis } from "./redis";
