@@ -9,7 +9,7 @@ const emailRegexPattern: RegExp =
 export interface IUser extends Document {
   name: string;
   email: string;
-  password: string;
+  password?: string;
   avatar: {
     public_id: string;
     url: string;
@@ -67,12 +67,14 @@ const userSchema: Schema<IUser> = new mongoose.Schema(
 );
 
 // Hash Password before saving
-userSchema.pre<IUser>("save", async function (next) {
+userSchema.pre<IUser>("save", async function () {
   if (!this.isModified("password")) {
-    next();
+    return;
+  }
+  if (!this.password) {
+    return;
   }
   this.password = await bcrypt.hash(this.password, 10);
-  next();
 });
 
 // Sign access token

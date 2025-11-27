@@ -4,7 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.app = void 0;
-require("dotenv").config();
+const dotenv_1 = __importDefault(require("dotenv"));
+dotenv_1.default.config();
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
@@ -22,10 +23,28 @@ exports.app.use(express_1.default.json({ limit: "50mb" }));
 // Cookie parser
 exports.app.use((0, cookie_parser_1.default)());
 // Cors => cross origin resource sharing
+// app.use(cors({
+//     origin: 
+//       process.env.ORIGIN,
+//       methods: ["GET", "POST", "PUT", "DELETE"],
+//       credentials: true,
+//   })
+// );
+// Parse allowed origins and setup CORS
+const allowedOrigins = process.env.ORIGIN?.split(",") || [];
 exports.app.use((0, cors_1.default)({
-    // origin: process.env.ORIGIN,
-    origin: ["http://localhost:3000"],
-    // methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: (origin, callback) => {
+        // Allow requests with no origin, e.g., mobile apps or Postman
+        if (!origin)
+            return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        else {
+            return callback(new Error("Not allowed by CORS"));
+        }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
 }));
 // api requests limit
@@ -36,7 +55,7 @@ const limiter = (0, express_rate_limit_1.rateLimit)({
     legacyHeaders: false,
 });
 // Routes
-exports.app.use("/api/v1", user_route_1.default, course_route_1.default, order_route_1.default, notification_route_1.default, analytics_route_1.default, layout_route_1.default);
+exports.app.use("/api/v1", user_route_1.default, order_route_1.default, course_route_1.default, notification_route_1.default, analytics_route_1.default, layout_route_1.default);
 // Testing API
 exports.app.get("/test", (req, res, next) => {
     res.status(200).json({

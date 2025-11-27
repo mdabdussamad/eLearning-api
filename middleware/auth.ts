@@ -1,66 +1,123 @@
+// import { Request, Response, NextFunction } from "express";
+// import { CatchAsyncError } from "./catchAsyncErrors";
+// import ErrorHandler from "../utils/ErrorHandler";
+// import jwt, { JwtPayload } from "jsonwebtoken";
+// import  redis  from "../utils/redis";
+// import { updateAccessToken } from "../controllers/user.controller";
+
+// // authenticated user
+// export const isAuthenticated = CatchAsyncError(
+//   async (req: Request, res: Response, next: NextFunction) => {
+//     const access_token = req.cookies.access_token as string;
+
+//     if (!access_token) {
+//       return next(
+//         new ErrorHandler("Please login to access this resource", 400)
+//       );
+//     }
+//     const decoded = jwt.decode(access_token) as JwtPayload;
+
+//     if (!decoded) {
+//       return next(new ErrorHandler("access token is not valid", 400));
+//     }
+
+//     // Check if the access token is expired
+//     if (decoded.exp && decoded.exp <= Date.now() / 1000) {
+//       try {
+//         await updateAccessToken(req, res, next);
+//       } catch (error) {
+//         return next(error);
+//       }
+//     } else {
+//       const user = await redis.get(decoded.id);
+
+//       if (!user) {
+//         return next(
+//           new ErrorHandler("Please login to access this resource", 400)
+//         );
+//       }
+
+//       req.user = JSON.parse(user);
+
+//       next();
+//     }
+//   }
+// );
+
+// // Middleware to authorize roles
+// export const authorizeRoles = (...roles: string[]) => {
+//   return (req: Request, res: Response, next: NextFunction) => {
+//     if (!req.user) {
+//       return next(new ErrorHandler("User not found", 401));
+//     }
+
+//     // Assuming that the user's role is stored in req.user.role
+//     if (!roles.includes(req.user.role)) {
+//       return next(
+//         new ErrorHandler(
+//           `Role (${req.user.role}) is not authorized to access this resource`,
+//           403
+//         )
+//       );
+//     }
+
+//     next();
+//   };
+// };
+
+// middleware/auth.ts
 import { Request, Response, NextFunction } from "express";
 import { CatchAsyncError } from "./catchAsyncErrors";
 import ErrorHandler from "../utils/ErrorHandler";
 import jwt, { JwtPayload } from "jsonwebtoken";
-import { redis } from "../utils/redis";
+import redis from "../utils/redis";
 import { updateAccessToken } from "../controllers/user.controller";
 
-// authenticated user
+// Authenticated user — FINAL FIXED VERSION
 export const isAuthenticated = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     const access_token = req.cookies.access_token as string;
 
     if (!access_token) {
-      return next(
-        new ErrorHandler("Please login to access this resource", 400)
-      );
-    }
-    const decoded = jwt.decode(access_token) as JwtPayload;
-
-    if (!decoded) {
-      return next(new ErrorHandler("access token is not valid", 400));
+      return next(new ErrorHandler("Please login to access this resource", 401));
     }
 
-    // Check if the access token is expired
-    if (decoded.exp && decoded.exp <= Date.now() / 1000) {
-      try {
-        await updateAccessToken(req, res, next);
-      } catch (error) {
-        return next(error);
-      }
-    } else {
-      const user = await redis.get(decoded.id);
+    let decoded: JwtPayload | null = null;
 
-      if (!user) {
-        return next(
-          new ErrorHandler("Please login to access this resource", 400)
-        );
-      }
-
-      req.user = JSON.parse(user);
-
-      next();
+    try {
+      // THIS IS THE CRITICAL FIX — use verify(), not decode()
+      decoded = jwt.verify(access_token, process.env.ACCESS_TOKEN!) as JwtPayload;
+    } catch (error: any) {
+      // Token expired or invalid → try refresh
+      return updateAccessToken(req, res, next);
     }
+
+    if (!decoded || !decoded.id) {
+      return next(new ErrorHandler("Invalid token", 401));
+    }
+
+    const user = await redis.get(decoded.id);
+
+    if (!user) {
+      return next(new ErrorHandler("Please login again", 401));
+    }
+
+    req.user = JSON.parse(user);
+    next();
   }
 );
 
-// Middleware to authorize roles
+// Authorize roles — PERFECT
 export const authorizeRoles = (...roles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return next(new ErrorHandler("User not found", 401));
-    }
-
-    // Assuming that the user's role is stored in req.user.role
-    if (!roles.includes(req.user.role)) {
+    if (!req.user || !roles.includes(req.user.role)) {
       return next(
         new ErrorHandler(
-          `Role (${req.user.role}) is not authorized to access this resource`,
+          `Role (${req.user?.role || "unknown"}) is not allowed to access this resource`,
           403
         )
       );
     }
-
     next();
   };
 };

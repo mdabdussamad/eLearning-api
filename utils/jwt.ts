@@ -1,8 +1,7 @@
-import dotenv from 'dotenv';
-dotenv.config();
+require("dotenv").config();
 import { Response } from "express";
 import { IUser } from "../models/user.model";
-import { redis } from "./redis";
+import redis from "./redis";
 
 interface ITokenOptions {
   expires: Date;
@@ -12,23 +11,16 @@ interface ITokenOptions {
   secure?: boolean;
 }
 
-// Parse environment variables tointegrate with callback value
-const accessTokenExpire = parseInt(
-  process.env.ACCESS_TOKEN_EXPIRE || "300",
-  10
-);
-const refreshTokenExpire = parseInt(
-  process.env.REFRESH_TOKEN_EXPIRE || "1200",
-  10
-);
+const accessTokenExpire = parseInt(process.env.ACCESS_TOKEN_EXPIRE || "300", 10);
+const refreshTokenExpire = parseInt(process.env.REFRESH_TOKEN_EXPIRE || "1200", 10);
 
-// Option for cookies
 export const accessTokenOptions: ITokenOptions = {
-  expires: new Date(Date.now() + accessTokenExpire * 60 * 60 * 1000),
-  maxAge: accessTokenExpire * 60 * 60 * 1000,
+  expires: new Date(Date.now() + accessTokenExpire * 60 * 1000),
+  maxAge: accessTokenExpire * 60 * 1000,
   httpOnly: true,
   sameSite: "lax",
 };
+
 export const refreshTokenOptions: ITokenOptions = {
   expires: new Date(Date.now() + refreshTokenExpire * 24 * 60 * 60 * 1000),
   maxAge: refreshTokenExpire * 24 * 60 * 60 * 1000,
@@ -40,13 +32,24 @@ export const sendToken = (user: IUser, statusCode: number, res: Response) => {
   const accessToken = user.SignAccessToken();
   const refreshToken = user.SignRefreshToken();
 
-  // Upload session to redis
+  // CRITICAL FIX: Convert _id to string before saving to Redis
   const userId = String(user._id);
-  redis.set(userId, JSON.stringify(user) as any);
 
-  // Only set secure to true in production
+  // Safe data for Redis (no Mongoose methods!)
+  const userForRedis = {
+    _id: userId,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatar: user.avatar,
+    isVerified: user.isVerified,
+  };
+
+  redis.set(userId, JSON.stringify(userForRedis));
+
   if (process.env.NODE_ENV === "production") {
     accessTokenOptions.secure = true;
+    refreshTokenOptions.secure = true;
   }
 
   res.cookie("access_token", accessToken, accessTokenOptions);
@@ -54,7 +57,7 @@ export const sendToken = (user: IUser, statusCode: number, res: Response) => {
 
   res.status(statusCode).json({
     success: true,
-    user,
+    user: userForRedis,
     accessToken,
   });
 };

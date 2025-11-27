@@ -49,12 +49,14 @@ const userSchema = new mongoose_1.default.Schema({
     ],
 }, { timestamps: true });
 // Hash Password before saving
-userSchema.pre("save", async function (next) {
+userSchema.pre("save", async function () {
     if (!this.isModified("password")) {
-        next();
+        return;
+    }
+    if (!this.password) {
+        return;
     }
     this.password = await bcryptjs_1.default.hash(this.password, 10);
-    next();
 });
 // Sign access token
 userSchema.methods.SignAccessToken = function () {

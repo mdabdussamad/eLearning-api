@@ -31,12 +31,6 @@ cloudinary_1.v2.config({
     api_key: process.env.CLOUD_API_KEY,
     api_secret: process.env.CLOUD_SECRET_KEY,
 });
-// CORS middleware configuration
-// const corsOptions = {
-//     origin: process.env.ORIGIN,
-//     credentials: true,
-// };
-// app.use(cors(corsOptions));
 (0, socketServer_1.initSocketServer)(server);
 // Create our server
 server.listen(process.env.PORT, () => {

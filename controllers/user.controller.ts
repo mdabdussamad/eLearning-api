@@ -12,14 +12,13 @@ import {
   refreshTokenOptions,
   sendToken,
 } from "../utils/jwt";
-import { redis } from "../utils/redis";
+import redis from "../utils/redis";
 import {
   getAllUsersService,
   getUserById,
   updateUserRolService,
 } from "../services/user.service";
 import cloudinary from "cloudinary";
-import { AnyARecord } from "dns";
 
 // Register user
 interface IRegistrationBody {
@@ -148,6 +147,39 @@ export const activateUser = CatchAsyncError(
   }
 );
 
+// // Login user
+// interface ILoginRequest {
+//   email: string;
+//   password: string;
+// }
+
+// export const loginUser = CatchAsyncError(
+//   async (req: Request, res: Response, next: NextFunction) => {
+//     try {
+//       const { email, password } = req.body as ILoginRequest;
+
+//       if (!email || !password) {
+//         return next(new ErrorHandler("Please enter email and password", 400));
+//       }
+
+//       const user = await userModel.findOne({ email }).select("+password");
+
+//       if (!user) {
+//         return next(new ErrorHandler("Invalid email or password", 400));
+//       }
+
+//       const isPasswordMatch = await user.comparePassword(password);
+//       if (!isPasswordMatch) {
+//         return next(new ErrorHandler("Invalid email or password", 400));
+//       }
+
+//       sendToken(user, 200, res);
+//     } catch (error: any) {
+//       return next(new ErrorHandler("Server Error", 400));
+//     }
+//   }
+// );
+
 // Login user
 interface ILoginRequest {
   email: string;
@@ -166,17 +198,18 @@ export const loginUser = CatchAsyncError(
       const user = await userModel.findOne({ email }).select("+password");
 
       if (!user) {
-        return next(new ErrorHandler("Invalid email or password", 400));
+        return next(new ErrorHandler("Invalid email or password", 401)); // ← 401 not 400
       }
 
       const isPasswordMatch = await user.comparePassword(password);
       if (!isPasswordMatch) {
-        return next(new ErrorHandler("Invalid email or password", 400));
+        return next(new ErrorHandler("Invalid email or password", 401)); // ← 401 not 400
       }
 
       sendToken(user, 200, res);
     } catch (error: any) {
-      return next(new ErrorHandler("Server Error", 400));
+      // ← LET THE REAL ERROR SHOW IN DEVELOPMENT
+      return next(new ErrorHandler(error.message || "Login failed", 500));
     }
   }
 );
@@ -199,7 +232,7 @@ export const logoutUser = CatchAsyncError(
   }
 );
 
-// Update access token
+// Update access token with redis
 export const updateAccessToken = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -254,14 +287,86 @@ export const updateAccessToken = CatchAsyncError(
   }
 );
 
+// Update access token without redis
+// export const updateAccessToken = CatchAsyncError(
+//   async (req: Request, res: Response, next: NextFunction) => {
+//     try {
+//       const refresh_token = req.cookies.refresh_token as string;
+//       const decoded = jwt.verify(
+//         refresh_token,
+//         process.env.REFRESH_TOKEN as string
+//       ) as JwtPayload;
+
+//       if (!decoded) {
+//         return next(new ErrorHandler("Could not refresh token", 400));
+//       }
+
+//       const userId = decoded.id;
+//       const user = await userModel.findById(userId);
+
+//       if (!user) {
+//         return next(new ErrorHandler("Please login for access this resource", 400));
+//       }
+
+//       const accessToken = jwt.sign(
+//         { id: user._id },
+//         process.env.ACCESS_TOKEN as string,
+//         {
+//           expiresIn: "5m",
+//         }
+//       );
+
+//       const refreshToken = jwt.sign(
+//         { id: user._id },
+//         process.env.REFRESH_TOKEN as string,
+//         {
+//           expiresIn: "3d",
+//         }
+//       );
+
+//       req.user = user;
+
+//       res.cookie("access_token", accessToken, accessTokenOptions);
+//       res.cookie("refresh_token", refreshToken, refreshTokenOptions);
+
+//       return next();
+//     } catch (error: any) {
+//       return next(new ErrorHandler(error.message, 400));
+//     }
+//   }
+// );
+
 // Get user info
 export const getUserInfo = CatchAsyncError(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const userId = req.user?._id as string;
-      getUserById(userId, res);
+      // CRITICAL: Convert ObjectId to string safely
+      const userId = req.user?._id ? String(req.user._id) : "";
+      
+      if (!userId) {
+        return next(new ErrorHandler("Unauthorized", 401));
+      }
+
+      const user = await userModel.findById(userId);
+      
+      if (!user) {
+        return next(new ErrorHandler("User not found", 404));
+      }
+
+      res.status(200).json({
+        success: true,
+        user: {
+          _id: String(user._id),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          avatar: user.avatar,
+          isVerified: user.isVerified,
+          courses: user.courses,
+        },
+      });
     } catch (error: any) {
-      return next(new ErrorHandler("Server Error", 400));
+      return next(new ErrorHandler(error.message || "Server error", 500));
     }
   }
 );

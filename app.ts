@@ -21,11 +21,28 @@ app.use(express.json({ limit: "50mb" }));
 app.use(cookieParser());
 
 // Cors => cross origin resource sharing
+// app.use(cors({
+//     origin: 
+//       process.env.ORIGIN,
+//       methods: ["GET", "POST", "PUT", "DELETE"],
+//       credentials: true,
+//   })
+// );
+
+// Parse allowed origins and setup CORS
+const allowedOrigins = process.env.ORIGIN?.split(",") || [];
 app.use(
   cors({
-    origin: process.env.ORIGIN,
-    // origin: ["http://localhost:3000"],
-    // methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: (origin, callback) => {
+      // Allow requests with no origin, e.g., mobile apps or Postman
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
@@ -33,17 +50,17 @@ app.use(
 // api requests limit
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 100, 
+  limit: 100,
   standardHeaders: "draft-7",
-  legacyHeaders: false, 
+  legacyHeaders: false,
 });
 
 // Routes
 app.use(
   "/api/v1",
   userRouter,
-  courseRouter,
   orderRouter,
+  courseRouter,
   notificationRouter,
   analyticsRouter,
   layoutRouter
@@ -62,8 +79,8 @@ app.all("*", (req: Request, res: Response, next: NextFunction) => {
   const err = new Error(`Route ${req.originalUrl} not found`) as any;
   err.statusCode = 404;
   next(err);
-});
-
+}); 
+ 
 // Middleware calls
 app.use(limiter);
 app.use(ErrorMiddleware);

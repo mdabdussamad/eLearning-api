@@ -33,13 +33,6 @@ cloudinary.config({
     api_secret: process.env.CLOUD_SECRET_KEY,
 });
 
-// CORS middleware configuration
-// const corsOptions = {
-//     origin: process.env.ORIGIN,
-//     credentials: true,
-// };
-// app.use(cors(corsOptions));
-
 initSocketServer(server);
 
 // Create our server

@@ -1,6 +1,22 @@
 import express from "express";
-import { addAnswer, addQuestion, addRelyReview, addReview, deleteCourse, editCourse, generateYouTubeUrl, getAdminAllCourses, getAllCourses, getCourseByUser, getSingleCourse, uploadCourse } from "../controllers/course.controller";
-import { authorizeRoles, isAuthenticated } from "../middleware/auth";
+import { 
+  addAnswer, 
+  addQuestion, 
+  addRelyReview, 
+  addReview, 
+  deleteCourse, 
+  editCourse, 
+  generateYouTubeUrl, 
+  getAdminAllCourses, 
+  getAllCourses, 
+  getCourseByUser, 
+  getSingleCourse, 
+  uploadCourse 
+} from "../controllers/course.controller";
+import { 
+  authorizeRoles, 
+  isAuthenticated 
+} from "../middleware/auth";
 
 const courseRouter = express.Router();
 

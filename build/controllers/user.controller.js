@@ -13,7 +13,7 @@ const ejs_1 = __importDefault(require("ejs"));
 const path_1 = __importDefault(require("path"));
 const sendMail_1 = __importDefault(require("../utils/sendMail"));
 const jwt_1 = require("../utils/jwt");
-const redis_1 = require("../utils/redis");
+const redis_1 = __importDefault(require("../utils/redis"));
 const user_service_1 = require("../services/user.service");
 const cloudinary_1 = __importDefault(require("cloudinary"));
 exports.registrationUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
@@ -105,16 +105,17 @@ exports.loginUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, nex
         }
         const user = await user_model_1.default.findOne({ email }).select("+password");
         if (!user) {
-            return next(new ErrorHandler_1.default("Invalid email or password", 400));
+            return next(new ErrorHandler_1.default("Invalid email or password", 401)); // ← 401 not 400
         }
         const isPasswordMatch = await user.comparePassword(password);
         if (!isPasswordMatch) {
-            return next(new ErrorHandler_1.default("Invalid email or password", 400));
+            return next(new ErrorHandler_1.default("Invalid email or password", 401)); // ← 401 not 400
         }
         (0, jwt_1.sendToken)(user, 200, res);
     }
     catch (error) {
-        return next(new ErrorHandler_1.default("Server Error", 400));
+        // ← LET THE REAL ERROR SHOW IN DEVELOPMENT
+        return next(new ErrorHandler_1.default(error.message || "Login failed", 500));
     }
 });
 // Logout user
@@ -123,7 +124,7 @@ exports.logoutUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, ne
         res.cookie("access_token", "", { maxAge: 1 });
         res.cookie("refresh_token", "", { maxAge: 1 });
         const userId = req.user?._id || "";
-        redis_1.redis.del(userId);
+        redis_1.default.del(userId);
         res.status(200).json({
             success: true,
             message: "Logged out successfully",
@@ -133,7 +134,7 @@ exports.logoutUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, ne
         return next(new ErrorHandler_1.default("Server Error", 400));
     }
 });
-// Update access token
+// Update access token with redis
 exports.updateAccessToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
     try {
         const refresh_token = req.cookies.refresh_token;
@@ -142,7 +143,7 @@ exports.updateAccessToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, 
         if (!decoded) {
             return next(new ErrorHandler_1.default(message, 400));
         }
-        const session = await redis_1.redis.get(decoded.id);
+        const session = await redis_1.default.get(decoded.id);
         if (!session) {
             return next(new ErrorHandler_1.default("Please login for access this resources!", 400));
         }
@@ -156,21 +157,80 @@ exports.updateAccessToken = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, 
         req.user = user;
         res.cookie("access_token", accessToken, jwt_1.accessTokenOptions);
         res.cookie("refresh_token", refreshToken, jwt_1.refreshTokenOptions);
-        await redis_1.redis.set(user._id, JSON.stringify(user), "EX", 604800); // 7days
+        await redis_1.default.set(user._id, JSON.stringify(user), "EX", 604800); // 7days
         return next();
     }
     catch (error) {
         return next(new ErrorHandler_1.default(error.message, 400));
     }
 });
+// Update access token without redis
+// export const updateAccessToken = CatchAsyncError(
+//   async (req: Request, res: Response, next: NextFunction) => {
+//     try {
+//       const refresh_token = req.cookies.refresh_token as string;
+//       const decoded = jwt.verify(
+//         refresh_token,
+//         process.env.REFRESH_TOKEN as string
+//       ) as JwtPayload;
+//       if (!decoded) {
+//         return next(new ErrorHandler("Could not refresh token", 400));
+//       }
+//       const userId = decoded.id;
+//       const user = await userModel.findById(userId);
+//       if (!user) {
+//         return next(new ErrorHandler("Please login for access this resource", 400));
+//       }
+//       const accessToken = jwt.sign(
+//         { id: user._id },
+//         process.env.ACCESS_TOKEN as string,
+//         {
+//           expiresIn: "5m",
+//         }
+//       );
+//       const refreshToken = jwt.sign(
+//         { id: user._id },
+//         process.env.REFRESH_TOKEN as string,
+//         {
+//           expiresIn: "3d",
+//         }
+//       );
+//       req.user = user;
+//       res.cookie("access_token", accessToken, accessTokenOptions);
+//       res.cookie("refresh_token", refreshToken, refreshTokenOptions);
+//       return next();
+//     } catch (error: any) {
+//       return next(new ErrorHandler(error.message, 400));
+//     }
+//   }
+// );
 // Get user info
 exports.getUserInfo = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, next) => {
     try {
-        const userId = req.user?._id;
-        (0, user_service_1.getUserById)(userId, res);
+        // CRITICAL: Convert ObjectId to string safely
+        const userId = req.user?._id ? String(req.user._id) : "";
+        if (!userId) {
+            return next(new ErrorHandler_1.default("Unauthorized", 401));
+        }
+        const user = await user_model_1.default.findById(userId);
+        if (!user) {
+            return next(new ErrorHandler_1.default("User not found", 404));
+        }
+        res.status(200).json({
+            success: true,
+            user: {
+                _id: String(user._id),
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                avatar: user.avatar,
+                isVerified: user.isVerified,
+                courses: user.courses,
+            },
+        });
     }
     catch (error) {
-        return next(new ErrorHandler_1.default("Server Error", 400));
+        return next(new ErrorHandler_1.default(error.message || "Server error", 500));
     }
 });
 // Social auth
@@ -199,7 +259,7 @@ exports.updateUserInfo = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res
             user.name = name;
         }
         await user?.save();
-        await redis_1.redis.set(userId, JSON.stringify(user));
+        await redis_1.default.set(userId, JSON.stringify(user));
     }
     catch (error) {
         return next(new ErrorHandler_1.default("Server Error", 400));
@@ -221,7 +281,7 @@ exports.updatePassword = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res
         }
         user.password = newPassword;
         await user.save();
-        await redis_1.redis.set(req.user?._id, JSON.stringify(user));
+        await redis_1.default.set(req.user?._id, JSON.stringify(user));
         res.status(200).json({
             Success: true,
             user,
@@ -263,7 +323,7 @@ exports.updateProfilePicture = (0, catchAsyncErrors_1.CatchAsyncError)(async (re
             }
         }
         await user?.save();
-        await redis_1.redis.set(userId, JSON.stringify(user));
+        await redis_1.default.set(userId, JSON.stringify(user));
         res.status(200).json({
             success: true,
             user,
@@ -311,7 +371,7 @@ exports.deleteUser = (0, catchAsyncErrors_1.CatchAsyncError)(async (req, res, ne
             return next(new ErrorHandler_1.default("User not found", 404));
         }
         await user.deleteOne({ id });
-        await redis_1.redis.del(id);
+        await redis_1.default.del(id);
         res.status(200).json({
             success: true,
             message: "User deleted successfully",
