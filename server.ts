@@ -35,8 +35,10 @@ cloudinary.config({
 
 initSocketServer(server);
 
-// Create our server
-server.listen(process.env.PORT, () => {
-    console.log(`Server is running on port ${process.env.PORT}`);
+// FIXED — This will work on Render (PORT=10000) AND locally (8000)
+const PORT = process.env.PORT || 8000;
+
+server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
     connectDB();
 });
